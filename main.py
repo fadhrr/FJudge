@@ -1,10 +1,14 @@
 from fastapi import FastAPI, HTTPException, Body
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from enum import Enum
 from typing import List, Annotated
 import subprocess
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
+
+app.mount("/editor", StaticFiles(directory="static",html = True), name="static")
 
 class Language(str, Enum):
     cpp = "cpp"
@@ -18,6 +22,7 @@ class CodeExecutionRequest(BaseModel):
 
 class CodeExecutionResponse(BaseModel):
     results: List[dict]
+
 
 @app.post("/api/submission")
 async def execute_code(
@@ -121,7 +126,3 @@ def run_code(source_code, language, input_data):
     else:
         raise Exception(result.stderr)
 
-# Jalankan aplikasi FastAPI
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
