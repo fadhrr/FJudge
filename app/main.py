@@ -1,14 +1,25 @@
-from fastapi import FastAPI, HTTPException, Body
+import os
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from enum import Enum
 from typing import List, Annotated
 import subprocess
 from fastapi.staticfiles import StaticFiles
+import uvicorn
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
+templates = Jinja2Templates(directory='templates')
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-app.mount("/editor", StaticFiles(directory="static",html = True), name="static")
+@app.get('/', response_class=HTMLResponse)
+def main(request: Request):
+    return templates.TemplateResponse('index.html', {"request": request, "base_url": str(request.url)})
+
 
 class Language(str, Enum):
     cpp = "cpp"
@@ -24,8 +35,8 @@ class CodeExecutionResponse(BaseModel):
     results: List[dict]
 
 
-@app.post("/api/submission")
-async def execute_code(
+@app.post("/api/judge")
+async def judger(
     request: Annotated[
         CodeExecutionRequest,
         Body(
@@ -125,4 +136,3 @@ def run_code(source_code, language, input_data):
         return result.stdout
     else:
         raise Exception(result.stderr)
-
