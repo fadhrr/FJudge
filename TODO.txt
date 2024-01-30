@@ -1,0 +1,4 @@
+- memperbiki struktur json request dan response
+    - menambahkan id(unique dari request lain) setiap request
+- support time dan memory
+- memisahkan modul berdasarkan bahasa pemrograman
