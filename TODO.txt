@@ -2,3 +2,8 @@
     - menambahkan id(unique dari request lain) setiap request
 - support time dan memory
 - memisahkan modul berdasarkan bahasa pemrograman
+
+DONE:
+- Handle time limit 5s default
+- Handle compile error
+- Show time

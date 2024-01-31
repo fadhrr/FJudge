@@ -32,7 +32,6 @@
             >Test Cases (JSON format):</label
           >
           <textarea id="test-cases" rows="5" class="w-full p-2 border rounded text-sm">
-[{ "input": "2\n3\n", "output": "5\n"},  {"input": "5\n3\n", "output": "12\n"}]
                 </textarea
           >
         </div>
@@ -108,12 +107,12 @@
           case "py":
             mode = "ace/mode/python";
             srcCode = `# Example Source Code\ndef add(a, b):\n    return a + b\n\na = int(input())\nb = int(input())\nprint(add(a,b))`;
-            testCases = `[{"input": "2\\n3\\n","output": "5\\n"},{"input": "5\\n3\\n","output": "12\\n"}]`;
+            testCases = `[{"input": "2\\n3\\n","expected_output": "5\\n"},{"input": "5\\n3\\n","expected_output": "12\\n"}]`;
             break;
           case "cpp":
             mode = "ace/mode/c_cpp";
             srcCode = `// Example Source Code\n#include <iostream>\n\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}`;
-            testCases = `[{"input": "2 3\\n","output": "5\\n"},{"input": "5 7\\n","output": "12\\n"}]`;
+            testCases = `[{"input": "2 3\\n","expected_output": "5\\n"},{"input": "5 7\\n","expected_output": "12\\n"}]`;
             break;
           // Tambahkan case untuk bahasa lain jika diperlukan
           default:
@@ -128,6 +127,7 @@
       const requestContainer = document.getElementById("request-container");
 
       const runCode = () => {
+        const identifier = "";
         const sourceCode = editor.getValue();
         const language = document.getElementById("language").value;
         const testCases = JSON.parse(
@@ -135,6 +135,7 @@
         );
 
         const requestBody = {
+          identifier: identifier,
           source_code: sourceCode,
           language: language,
           test_cases: testCases,

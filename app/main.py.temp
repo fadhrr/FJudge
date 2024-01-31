@@ -1,6 +1,4 @@
 import os
-import time
-import uuid
 from fastapi import FastAPI, HTTPException, Body, Request, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -28,20 +26,16 @@ class Language(str, Enum):
     py = "py"
 
 class CodeExecutionRequest(BaseModel):
-    identifier: str
     source_code: str
     language: str
     test_cases: List[dict]
 
 
 class CodeExecutionResponse(BaseModel):
-    identifier: str
-    source_code: str
-    Language: str
     results: List[dict]
 
 
-@app.post("/api/judge", response_model=CodeExecutionResponse)
+@app.post("/api/judge")
 async def judge(
     request: Annotated[
         CodeExecutionRequest,
@@ -51,17 +45,16 @@ async def judge(
                     "summary": "Python",
                     "description": "",
                     "value": {
-                        "identifier": "YOUR_IDENTIFIER_REQUEST",
                         "source_code": "def add(a, b):\n    return a + b\n\na = int(input())\nb = int(input())\nprint(add(a,b))",
                         "language": "py",
                         "test_cases": [
                             {
                             "input": "2\n3\n",
-                            "expected_output": "5\n"
+                            "output": "5\n"
                             },
                             {
                             "input": "5\n3\n",
-                            "expected_output": "12\n"
+                            "output": "12\n"
                             }
                         ],
                     },
@@ -70,48 +63,43 @@ async def judge(
                     "summary": "C/C++",
                     "description": "",
                     "value": {
-                        "identifier": "YOUR_IDENTIFIER_REQUEST",
                         "source_code": "#include <iostream>\nusing namespace std;\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}",
                         "language": "cpp",
                         "test_cases": [
                             {
                             "input": "2 3\n",
-                            "expected_output": "5\n"
+                            "output": "5\n"
                             },
                             {
                             "input": "5 7\n",
-                            "expected_output": "12\n"
+                            "output": "12\n"
                             }
                         ],
                     },
                 },
             },
         ),
+        session_id: str = Cookie(..., description="Session ID"),
     ],
 ):
     results = []
 
     for test_case in request.test_cases:
         input_data = test_case.get("input", "")
-        expected_output = test_case.get("expected_output", "")
-        session_id = str(uuid.uuid4())  # Menggunakan uuid sebagai session_id
+        expected_output = test_case.get("output", "")
 
         try:
             # Menjalankan source code dengan input tertentu
-            result, execution_time = run_code(request.source_code, request.language, input_data, session_id)
+            result = run_code(request.source_code, request.language, input_data, request.session_id)
 
-            if result.returncode == 0:
-                status = result.stdout.strip() == expected_output.strip()
-            else:
-                print(result.stdout)
-                status = result.stderr
+            # Membandingkan hasil dengan output yang diharapkan
+            is_passed = result.strip() == expected_output.strip()
 
             results.append({
                 "input": input_data,
                 "expected_output": expected_output,
-                "actual_output": result.stdout,
-                "status": status,
-                "time": execution_time
+                "actual_output": result,
+                "is_passed": is_passed
             })
 
         except Exception as e:
@@ -119,66 +107,39 @@ async def judge(
                 "input": input_data,
                 "expected_output": expected_output,
                 "actual_output": f"Error: {str(e)}",
-                "status": "Err",
-                "time": execution_time
+                "is_passed": False
             })
 
-    # Membuat instansiasi dari model CodeExecutionResponse
-    response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , Language=request.language, results=results)
-    return response_model
+    return results
 
 def run_code(source_code, language, input_data, session_id):
-    execution_time = 0
-
     # Menyimpan source code ke file sementara
-    file_name = f"temp_{session_id}.{language}"
+    file_name = f"temp_code_executable_{session_id}.{language}"
     with open(file_name, "w") as file:
         file.write(source_code)
 
-
     if language == "cpp":
         # Menjalankan kompilasi hanya jika belum pernah dikompilasi sebelumnya
-        if not os.path.exists(f"temp_{session_id}"):
-            compile_result = subprocess.run(["g++", file_name, "-o", f"temp_{session_id}"], capture_output=True)
+        if not os.path.exists(f"temp_code_executable_{session_id}"):
+            compile_result = subprocess.run(["g++", file_name, "-o", f"temp_code_executable_{session_id}"], capture_output=True)
             if compile_result.returncode != 0:
-                # Jika gagal kompilasi
-                # result = subprocess.CompletedProcess(args=[], returncode=-1, stderr=compile_result.stderr.decode("utf-8"))
-                result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Compile Error")
-
-                # Menghapus file sementara jika sudah selesai digunakan
-                os.remove(file_name)
-
-                # Mengembalikan hasil eksekusi
-                return result, execution_time
-
-    start_time = time.time()  # Waktu mulai eksekusi
+                raise Exception(compile_result.stderr)
 
     # Menjalankan source code dengan input tertentu menggunakan subprocess
-    
     if language == "cpp":
-        try:
-            result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
-            # Menghapus file compiled jika sudah selesai digunakan
-            os.remove(f"temp_{session_id}")
-        except subprocess.TimeoutExpired:
-            os.remove(f"temp_{session_id}")
-            result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Time Limit Exceeded")
+        result = subprocess.run([f"./temp_code_executable_{session_id}"], input=input_data, text=True, capture_output=True)
     elif language == "py":
-        try:
-            result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
-        except subprocess.TimeoutExpired:
-            result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Time Limit Exceeded")
-
+        result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True)
     # Tambahkan kondisi untuk bahasa lainnya sesuai kebutuhan
-    
-    execution_time = time.time() - start_time  # Waktu eksekusi dalam detik
 
     # Menghapus file sementara jika sudah selesai digunakan
-    os.remove(file_name)
+    subprocess.run(["rm", file_name])
 
     # Mengembalikan hasil eksekusi
-    return result, execution_time
-
+    if result.returncode == 0:
+        return result.stdout
+    else:
+        raise Exception(result.stderr)
 
 
 
