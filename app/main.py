@@ -101,7 +101,10 @@ async def judge(
             result, execution_time = run_code(request.source_code, request.language, input_data, session_id)
 
             if result.returncode == 0:
-                status = result.stdout.strip() == expected_output.strip()
+                if result.stdout.strip() == expected_output.strip():
+                    status = "Accepted"
+                else:
+                    status = "Wrong Answer"
             else:
                 print(result.stdout)
                 status = result.stderr
