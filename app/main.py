@@ -4,6 +4,7 @@ import uuid
 from fastapi import FastAPI, HTTPException, Body, Request, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from enum import Enum
 from typing import List, Annotated
@@ -14,7 +15,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 app = FastAPI()
+
+origins = [
+    "*",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 templates = Jinja2Templates(directory='templates')
 # app.mount("/static", StaticFiles(directory="static"), name="static")
 

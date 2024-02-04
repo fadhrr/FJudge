@@ -2,6 +2,7 @@
     - menambahkan id(unique dari request lain) setiap request
 - support time dan memory
 - memisahkan modul berdasarkan bahasa pemrograman
+- buat avg_time dari semua test_cases time
 
 DONE:
 - Handle time limit 5s default
