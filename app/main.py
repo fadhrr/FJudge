@@ -134,6 +134,8 @@ async def judge(
             })
 
         except Exception as e:
+            execution_time = 0
+            avg_time = 0
             results.append({
                 "input": input_data,
                 "expected_output": expected_output,
@@ -141,6 +143,8 @@ async def judge(
                 "status": "Err",
                 "time": execution_time
             })
+            response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , Language=request.language, results=results, avg_time=avg_time)
+            return response_model
     
     total_time = 0
     for result in results:
