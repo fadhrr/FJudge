@@ -182,16 +182,27 @@ def run_code(source_code, language, input_data, session_id):
     if language == "cpp":
         try:
             result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+            if result.stderr:
+                result.stderr="Runtime Exception"
             # Menghapus file compiled jika sudah selesai digunakan
             os.remove(f"temp_{session_id}")
         except subprocess.TimeoutExpired:
             os.remove(f"temp_{session_id}")
             result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Time Limit Exceeded")
+        except subprocess.CalledProcessError as e:
+            # Tangani kesalahan saat menjalankan program C++ yang dikompilasi
+            result = subprocess.CompletedProcess(args=e.cmd, returncode=e.returncode, stderr=e.stderr)
     elif language == "py":
         try:
             result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+            
+            if result.stderr:
+                result.stderr="Runtime Exception"
         except subprocess.TimeoutExpired:
             result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Time Limit Exceeded")
+        except subprocess.CalledProcessError as e:
+            # Tangani kesalahan saat menjalankan program Python
+            result = subprocess.CompletedProcess(args=e.cmd, returncode=e.returncode, stderr=e.stderr)
 
     # Tambahkan kondisi untuk bahasa lainnya sesuai kebutuhan
     
