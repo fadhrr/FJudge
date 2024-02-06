@@ -54,6 +54,7 @@ class CodeExecutionResponse(BaseModel):
     source_code: str
     Language: str
     results: List[dict]
+    avg_time: float
 
 
 @app.post("/api/judge", response_model=CodeExecutionResponse)
@@ -140,9 +141,14 @@ async def judge(
                 "status": "Err",
                 "time": execution_time
             })
+    
+    total_time = 0
+    for result in results:
+        total_time += result["time"]
+    avg_time = total_time/len(results)
 
     # Membuat instansiasi dari model CodeExecutionResponse
-    response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , Language=request.language, results=results)
+    response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , Language=request.language, results=results, avg_time=avg_time)
     return response_model
 
 def run_code(source_code, language, input_data, session_id):
