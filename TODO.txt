@@ -1,4 +1,6 @@
 - memisahkan modul berdasarkan bahasa pemrograman
+- buat status overall test_cases
+- klo runtime, compile, time limit error maka test case selanjutnya tidak dijalankan
 
 DONE:
 - buat avg_time dari semua test_cases time
