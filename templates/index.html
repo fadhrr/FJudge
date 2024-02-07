@@ -19,8 +19,8 @@
             >Choose a language:</label
           >
           <select id="language" class="w-full p-2 border rounded">
-            <option value="py">Python</option>
-            <option value="cpp">C++</option>
+            <option value="3">Python</option>
+            <option value="2">C++</option>
             <!-- Add options for other programming languages as needed -->
           </select>
         </div>
@@ -104,12 +104,12 @@
       function setEditorMode(language) {
         let mode;
         switch (language) {
-          case "py":
+          case "3":
             mode = "ace/mode/python";
             srcCode = `# Example Source Code\ndef add(a, b):\n    return a + b\n\na = int(input())\nb = int(input())\nprint(add(a,b))`;
             testCases = `[{"input": "2\\n3\\n","expected_output": "5\\n"},{"input": "5\\n3\\n","expected_output": "12\\n"}]`;
             break;
-          case "cpp":
+          case "2":
             mode = "ace/mode/c_cpp";
             srcCode = `// Example Source Code\n#include <iostream>\n\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}`;
             testCases = `[{"input": "2 3\\n","expected_output": "5\\n"},{"input": "5 7\\n","expected_output": "12\\n"}]`;
@@ -127,7 +127,7 @@
       const requestContainer = document.getElementById("request-container");
 
       const runCode = () => {
-        const identifier = "";
+        const identifier = "FJudge";
         const sourceCode = editor.getValue();
         const language = document.getElementById("language").value;
         const testCases = JSON.parse(
@@ -137,7 +137,7 @@
         const requestBody = {
           identifier: identifier,
           source_code: sourceCode,
-          language: language,
+          language_id: language,
           test_cases: testCases,
         };
 
