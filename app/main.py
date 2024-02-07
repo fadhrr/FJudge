@@ -105,7 +105,7 @@ async def judge(
     ],
 ):
     results = []
-    status = None
+    status = ""
 
     session_id = str(uuid.uuid4())  # Menggunakan uuid sebagai session_id
 
@@ -171,7 +171,7 @@ def run_code(source_code, language_id, test_cases, session_id):
                 
                 # untuk menampilkan warning error saat kompilasi
                 result_dict["err_msg"] = compile_result.stderr
-                print(compile_result)
+                # print(compile_result)
                 if compile_result.returncode != 0:
                     # Jika gagal kompilasi
                     result_dict["status"] = "CTE"
@@ -192,7 +192,7 @@ def run_code(source_code, language_id, test_cases, session_id):
         if languages[language_id] == "cpp" or languages[language_id] == "c":
             try:
                 result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
-                print(result)
+                # print(result)
                 if result.returncode != 0:
                     result_dict["status"] = "RTE"
                 
@@ -207,7 +207,7 @@ def run_code(source_code, language_id, test_cases, session_id):
         elif languages[language_id] == "py":
             try:
                 result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
-                print(result)
+                # print(result)
                 result_dict["err_msg"] = result.stderr
                 if result.returncode != 0:
                     result_dict["status"] = "RTE"
