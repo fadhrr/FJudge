@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from enum import Enum
-from typing import List, Annotated
+from typing import List, Annotated, Union
 import subprocess
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -42,17 +42,19 @@ class Language(str, Enum):
     cpp = "cpp"
     py = "py"
 
+languages = ["java", "cpp", "c", "py"]
+
 class CodeExecutionRequest(BaseModel):
-    identifier: str
+    identifier: Union[int, str]
     source_code: str
-    language: str
+    language_id: int
     test_cases: List[dict]
 
 
 class CodeExecutionResponse(BaseModel):
-    identifier: str
+    identifier: Union[int, str]
     source_code: str
-    Language: str
+    language_id: int
     results: List[dict]
     avg_time: float
 
@@ -67,9 +69,9 @@ async def judge(
                     "summary": "Python",
                     "description": "",
                     "value": {
-                        "identifier": "YOUR_IDENTIFIER_REQUEST",
+                        "identifier": 0,
                         "source_code": "def add(a, b):\n    return a + b\n\na = int(input())\nb = int(input())\nprint(add(a,b))",
-                        "language": "py",
+                        "language_id": 3,
                         "test_cases": [
                             {
                             "input": "2\n3\n",
@@ -86,9 +88,9 @@ async def judge(
                     "summary": "C/C++",
                     "description": "",
                     "value": {
-                        "identifier": "YOUR_IDENTIFIER_REQUEST",
+                        "identifier": 0,
                         "source_code": "#include <iostream>\nusing namespace std;\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}",
-                        "language": "cpp",
+                        "language_id": 2,
                         "test_cases": [
                             {
                             "input": "2 3\n",
@@ -114,7 +116,7 @@ async def judge(
 
         try:
             # Menjalankan source code dengan input tertentu
-            result, execution_time = run_code(request.source_code, request.language, input_data, session_id)
+            result, execution_time = run_code(request.source_code, request.language_id, input_data, session_id)
 
             if result.returncode == 0:
                 if result.stdout.strip() == expected_output.strip():
@@ -143,7 +145,7 @@ async def judge(
                 "status": "Err",
                 "time": execution_time
             })
-            response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , Language=request.language, results=results, avg_time=avg_time)
+            response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time)
             return response_model
     
     total_time = 0
@@ -152,19 +154,19 @@ async def judge(
     avg_time = total_time/len(results)
 
     # Membuat instansiasi dari model CodeExecutionResponse
-    response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , Language=request.language, results=results, avg_time=avg_time)
+    response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time)
     return response_model
 
-def run_code(source_code, language, input_data, session_id):
+def run_code(source_code, language_id, input_data, session_id):
     execution_time = 0
 
     # Menyimpan source code ke file sementara
-    file_name = f"temp_{session_id}.{language}"
+    file_name = f"temp_{session_id}.{languages[language_id]}"
     with open(file_name, "w") as file:
         file.write(source_code)
 
 
-    if language == "cpp":
+    if languages[language_id] == "cpp" or languages[language_id] == "c":
         # Menjalankan kompilasi hanya jika belum pernah dikompilasi sebelumnya
         if not os.path.exists(f"temp_{session_id}"):
             compile_result = subprocess.run(["g++", file_name, "-o", f"temp_{session_id}"], capture_output=True)
@@ -183,7 +185,7 @@ def run_code(source_code, language, input_data, session_id):
 
     # Menjalankan source code dengan input tertentu menggunakan subprocess
     
-    if language == "cpp":
+    if languages[language_id] == "cpp" or languages[language_id] == "c":
         try:
             result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
             if result.stderr:
@@ -196,7 +198,7 @@ def run_code(source_code, language, input_data, session_id):
         except subprocess.CalledProcessError as e:
             # Tangani kesalahan saat menjalankan program C++ yang dikompilasi
             result = subprocess.CompletedProcess(args=e.cmd, returncode=e.returncode, stderr=e.stderr)
-    elif language == "py":
+    elif languages[language_id] == "py":
         try:
             result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
             
