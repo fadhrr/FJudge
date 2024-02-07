@@ -53,7 +53,7 @@ class CodeExecutionResponse(BaseModel):
     language_id: int
     results: List[dict]
     avg_time: float
-    status: str
+    verdict: str
 
 
 @app.post("/api/judge", response_model=CodeExecutionResponse)
@@ -105,7 +105,7 @@ async def judge(
     ],
 ):
     results = []
-    status = ""
+    verdict = ""
 
     session_id = str(uuid.uuid4())  # Menggunakan uuid sebagai session_id
 
@@ -119,26 +119,34 @@ async def judge(
         total_time = 0
         for result in results:
             total_time += result["time"]
-
-            if "CTE" == result["status"]:
-                status = "CTE"
-            elif "RTE" == result["status"]:
-                status = "RTE"
-            elif "TLE" == result["status"]:
-                status = "TLE"
         avg_time = total_time/len(results)
 
-
+        test_num = 0
+        for result in results:
+            if "CTE" == result["status"]:
+                verdict = f"CTE"
+                break
+            elif "RTE" == result["status"]:
+                verdict = f"RTE"
+                break
+            elif "TLE" == result["status"]:
+                verdict = f"TLE"
+                break
+            elif "WA" == result["status"]:
+                verdict = f"WA"
+                break
+            elif "AC" == result["status"]:
+                verdict = f"AC"
+            
+        # Membuat instansiasi dari model CodeExecutionResponse
+        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time, verdict=verdict)
+        return response_model
 
     except Exception as e:
-        status = e
-        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=0, status=e)
+        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=0, verdict=e)
         return response_model
     
 
-    # Membuat instansiasi dari model CodeExecutionResponse
-    response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time, status=status)
-    return response_model
 
 def run_code(source_code, language_id, test_cases, session_id):
     results = []
