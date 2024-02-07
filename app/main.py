@@ -154,6 +154,7 @@ def run_code(source_code, language_id, test_cases, session_id):
             "expected_output": expected_output,
             "actual_output": None,
             "status": None,
+            "err_msg": None,
             "time": None
         }
 
@@ -166,14 +167,16 @@ def run_code(source_code, language_id, test_cases, session_id):
         if languages[language_id] == "cpp" or languages[language_id] == "c":
             # Menjalankan kompilasi hanya jika belum pernah dikompilasi sebelumnya
             if not os.path.exists(f"temp_{session_id}"):
-                compile_result = subprocess.run(["g++", file_name, "-o", f"temp_{session_id}"], capture_output=True)
+                compile_result = subprocess.run(["g++", "-g", file_name, "-o", f"temp_{session_id}"], capture_output=True)
+                
+                # untuk menampilkan warning error saat kompilasi
+                result_dict["err_msg"] = compile_result.stderr
                 print(compile_result)
                 if compile_result.returncode != 0:
                     # Jika gagal kompilasi
-                    # result = subprocess.CompletedProcess(args=[], returncode=-1, stderr=compile_result.stderr.decode("utf-8"))
-                    result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Compile Error")
-                    result_dict["status"] = result.stderr
+                    result_dict["status"] = "Compile Error"
                     result_dict["time"] = 0
+                    result_dict["err_msg"] = compile_result.stderr
                     results.append(result_dict)
 
                     # Menghapus file sementara jika sudah selesai digunakan
@@ -189,9 +192,10 @@ def run_code(source_code, language_id, test_cases, session_id):
         if languages[language_id] == "cpp" or languages[language_id] == "c":
             try:
                 result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
-                
+                print(result)
                 if result.returncode != 0:
                     result_dict["status"] = "Runtime Exception"
+                
                 # Menghapus file compiled jika sudah selesai digunakan
                 os.remove(f"temp_{session_id}")
             except subprocess.TimeoutExpired:
@@ -204,6 +208,7 @@ def run_code(source_code, language_id, test_cases, session_id):
             try:
                 result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
                 print(result)
+                result_dict["err_msg"] = result.stderr
                 if result.returncode != 0:
                     result_dict["status"] = "Runtime Exception"
             except subprocess.TimeoutExpired:
