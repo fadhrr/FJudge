@@ -109,44 +109,27 @@ async def judge(
 ):
     results = []
 
-    for test_case in request.test_cases:
-        input_data = test_case.get("input", "")
-        expected_output = test_case.get("expected_output", "")
-        session_id = str(uuid.uuid4())  # Menggunakan uuid sebagai session_id
+    
+    session_id = str(uuid.uuid4())  # Menggunakan uuid sebagai session_id
 
-        try:
-            # Menjalankan source code dengan input tertentu
-            result, execution_time = run_code(request.source_code, request.language_id, input_data, session_id)
+    try:
+        # Menjalankan source code dengan input tertentu
+        result_test_cases = run_code(request.source_code, request.language_id, request.test_cases, session_id)
 
-            if result.returncode == 0:
-                if result.stdout.strip() == expected_output.strip():
-                    status = "Accepted"
-                else:
-                    status = "Wrong Answer"
-            else:
-                print(result.stdout)
-                status = result.stderr
+        results = result_test_cases
 
-            results.append({
-                "input": input_data,
-                "expected_output": expected_output,
-                "actual_output": result.stdout,
-                "status": status,
-                "time": execution_time
-            })
-
-        except Exception as e:
-            execution_time = 0
-            avg_time = 0
-            results.append({
-                "input": input_data,
-                "expected_output": expected_output,
-                "actual_output": f"Error: {str(e)}",
-                "status": "Err",
-                "time": execution_time
-            })
-            response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time)
-            return response_model
+    except Exception as e:
+        execution_time = 0
+        avg_time = 0
+        results.append({
+            "input": "",
+            "expected_output": "",
+            "actual_output": f"Error: {str(e)}",
+            "status": "Err",
+            "time": execution_time
+        })
+        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time)
+        return response_model
     
     total_time = 0
     for result in results:
@@ -157,68 +140,99 @@ async def judge(
     response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time)
     return response_model
 
-def run_code(source_code, language_id, input_data, session_id):
-    execution_time = 0
-
-    # Menyimpan source code ke file sementara
-    file_name = f"temp_{session_id}.{languages[language_id]}"
-    with open(file_name, "w") as file:
-        file.write(source_code)
-
-
-    if languages[language_id] == "cpp" or languages[language_id] == "c":
-        # Menjalankan kompilasi hanya jika belum pernah dikompilasi sebelumnya
-        if not os.path.exists(f"temp_{session_id}"):
-            compile_result = subprocess.run(["g++", file_name, "-o", f"temp_{session_id}"], capture_output=True)
-            if compile_result.returncode != 0:
-                # Jika gagal kompilasi
-                # result = subprocess.CompletedProcess(args=[], returncode=-1, stderr=compile_result.stderr.decode("utf-8"))
-                result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Compile Error")
-
-                # Menghapus file sementara jika sudah selesai digunakan
-                os.remove(file_name)
-
-                # Mengembalikan hasil eksekusi
-                return result, execution_time
-
-    start_time = time.time()  # Waktu mulai eksekusi
-
-    # Menjalankan source code dengan input tertentu menggunakan subprocess
+def run_code(source_code, language_id, test_cases, session_id):
+    results = []
     
-    if languages[language_id] == "cpp" or languages[language_id] == "c":
-        try:
-            result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
-            if result.stderr:
-                result.stderr="Runtime Exception"
-            # Menghapus file compiled jika sudah selesai digunakan
-            os.remove(f"temp_{session_id}")
-        except subprocess.TimeoutExpired:
-            os.remove(f"temp_{session_id}")
-            result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Time Limit Exceeded")
-        except subprocess.CalledProcessError as e:
-            # Tangani kesalahan saat menjalankan program C++ yang dikompilasi
-            result = subprocess.CompletedProcess(args=e.cmd, returncode=e.returncode, stderr=e.stderr)
-    elif languages[language_id] == "py":
-        try:
-            result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
-            
-            if result.stderr:
-                result.stderr="Runtime Exception"
-        except subprocess.TimeoutExpired:
-            result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Time Limit Exceeded")
-        except subprocess.CalledProcessError as e:
-            # Tangani kesalahan saat menjalankan program Python
-            result = subprocess.CompletedProcess(args=e.cmd, returncode=e.returncode, stderr=e.stderr)
 
-    # Tambahkan kondisi untuk bahasa lainnya sesuai kebutuhan
-    
-    execution_time = time.time() - start_time  # Waktu eksekusi dalam detik
+    for test_case in test_cases:
+        
+        input_data = test_case.get("input", "")
+        expected_output = test_case.get("expected_output", "")
 
-    # Menghapus file sementara jika sudah selesai digunakan
-    os.remove(file_name)
+        result_dict = {
+            "input": input_data,
+            "expected_output": expected_output,
+            "actual_output": None,
+            "status": None,
+            "time": None
+        }
+
+        # Menyimpan source code ke file sementara
+        file_name = f"temp_{session_id}.{languages[language_id]}"
+        with open(file_name, "w") as file:
+            file.write(source_code)
+
+
+        if languages[language_id] == "cpp" or languages[language_id] == "c":
+            # Menjalankan kompilasi hanya jika belum pernah dikompilasi sebelumnya
+            if not os.path.exists(f"temp_{session_id}"):
+                compile_result = subprocess.run(["g++", file_name, "-o", f"temp_{session_id}"], capture_output=True)
+                print(compile_result)
+                if compile_result.returncode != 0:
+                    # Jika gagal kompilasi
+                    # result = subprocess.CompletedProcess(args=[], returncode=-1, stderr=compile_result.stderr.decode("utf-8"))
+                    result = subprocess.CompletedProcess(args=[], returncode=-1, stderr="Compile Error")
+                    result_dict["status"] = result.stderr
+                    result_dict["time"] = 0
+                    results.append(result_dict)
+
+                    # Menghapus file sementara jika sudah selesai digunakan
+                    os.remove(file_name)
+
+                    # Mengembalikan hasil eksekusi
+                    return results
+
+        start_time = time.time()  # Waktu mulai eksekusi
+
+        # Menjalankan source code dengan input tertentu menggunakan subprocess
+        
+        if languages[language_id] == "cpp" or languages[language_id] == "c":
+            try:
+                result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+                
+                if result.returncode != 0:
+                    result_dict["status"] = "Runtime Exception"
+                # Menghapus file compiled jika sudah selesai digunakan
+                os.remove(f"temp_{session_id}")
+            except subprocess.TimeoutExpired:
+                os.remove(f"temp_{session_id}")
+                result_dict["status"] = "Time Limit Exceeded"
+            except subprocess.CalledProcessError as e:
+                # Tangani kesalahan saat menjalankan program C++ yang dikompilasi
+                result_dict["status"] = str(e)
+        elif languages[language_id] == "py":
+            try:
+                result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+                print(result)
+                if result.returncode != 0:
+                    result_dict["status"] = "Runtime Exception"
+            except subprocess.TimeoutExpired:
+                result_dict["status"] = "Time Limit Exceeded"
+            except subprocess.CalledProcessError as e:
+                # Tangani kesalahan saat menjalankan program Python
+                result_dict["status"] = str(e)
+
+        # Tambahkan kondisi untuk bahasa lainnya sesuai kebutuhan
+        
+        execution_time = time.time() - start_time  # Waktu eksekusi dalam detik
+
+        # Menghapus file sementara jika sudah selesai digunakan
+        os.remove(file_name)
+
+        result_dict["time"] = execution_time
+        result_dict["actual_output"] = result.stdout
+
+        if result.returncode == 0:
+            if result.stdout.strip() == expected_output.strip():
+                result_dict["status"] = "Accepted"
+            else:
+                result_dict["status"] = "Wrong Answer"
+
+        results.append(result_dict)
+
 
     # Mengembalikan hasil eksekusi
-    return result, execution_time
+    return results
 
 
 

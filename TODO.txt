@@ -1,9 +1,9 @@
 - memisahkan modul berdasarkan bahasa pemrograman
-- test_cases check berhenti ketika compile, runtime, dan time limit
-- code language support angka
-- identifier support integer
 
 DONE:
+- test_cases check berhenti ketika compile, runtime, dan time limit
+- identifier support integer dan string
+- code language dalam int
 - buat avg_time dari semua test_cases time
 - Handle time limit 5s default
 - Handle compile error
