@@ -38,10 +38,6 @@ def main(request: Request):
     return templates.TemplateResponse('index.html', {"request": request, "base_url": str(request.base_url)})
 
 
-class Language(str, Enum):
-    cpp = "cpp"
-    py = "py"
-
 languages = ["java", "cpp", "c", "py"]
 
 class CodeExecutionRequest(BaseModel):
@@ -57,6 +53,7 @@ class CodeExecutionResponse(BaseModel):
     language_id: int
     results: List[dict]
     avg_time: float
+    status: str
 
 
 @app.post("/api/judge", response_model=CodeExecutionResponse)
@@ -108,8 +105,8 @@ async def judge(
     ],
 ):
     results = []
+    status = None
 
-    
     session_id = str(uuid.uuid4())  # Menggunakan uuid sebagai session_id
 
     try:
@@ -118,26 +115,29 @@ async def judge(
 
         results = result_test_cases
 
+        # menghitung rata-rata time 
+        total_time = 0
+        for result in results:
+            total_time += result["time"]
+
+            if "CTE" == result["status"]:
+                status = "CTE"
+            elif "RTE" == result["status"]:
+                status = "RTE"
+            elif "TLE" == result["status"]:
+                status = "TLE"
+        avg_time = total_time/len(results)
+
+
+
     except Exception as e:
-        execution_time = 0
-        avg_time = 0
-        results.append({
-            "input": "",
-            "expected_output": "",
-            "actual_output": f"Error: {str(e)}",
-            "status": "Err",
-            "time": execution_time
-        })
-        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time)
+        status = e
+        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=0, status=e)
         return response_model
     
-    total_time = 0
-    for result in results:
-        total_time += result["time"]
-    avg_time = total_time/len(results)
 
     # Membuat instansiasi dari model CodeExecutionResponse
-    response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time)
+    response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time, status=status)
     return response_model
 
 def run_code(source_code, language_id, test_cases, session_id):
@@ -174,7 +174,7 @@ def run_code(source_code, language_id, test_cases, session_id):
                 print(compile_result)
                 if compile_result.returncode != 0:
                     # Jika gagal kompilasi
-                    result_dict["status"] = "Compile Error"
+                    result_dict["status"] = "CTE"
                     result_dict["time"] = 0
                     result_dict["err_msg"] = compile_result.stderr
                     results.append(result_dict)
@@ -194,13 +194,13 @@ def run_code(source_code, language_id, test_cases, session_id):
                 result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
                 print(result)
                 if result.returncode != 0:
-                    result_dict["status"] = "Runtime Exception"
+                    result_dict["status"] = "RTE"
                 
                 # Menghapus file compiled jika sudah selesai digunakan
                 os.remove(f"temp_{session_id}")
             except subprocess.TimeoutExpired:
                 os.remove(f"temp_{session_id}")
-                result_dict["status"] = "Time Limit Exceeded"
+                result_dict["status"] = "TLE"
             except subprocess.CalledProcessError as e:
                 # Tangani kesalahan saat menjalankan program C++ yang dikompilasi
                 result_dict["status"] = str(e)
@@ -210,9 +210,9 @@ def run_code(source_code, language_id, test_cases, session_id):
                 print(result)
                 result_dict["err_msg"] = result.stderr
                 if result.returncode != 0:
-                    result_dict["status"] = "Runtime Exception"
+                    result_dict["status"] = "RTE"
             except subprocess.TimeoutExpired:
-                result_dict["status"] = "Time Limit Exceeded"
+                result_dict["status"] = "TLE"
             except subprocess.CalledProcessError as e:
                 # Tangani kesalahan saat menjalankan program Python
                 result_dict["status"] = str(e)
@@ -229,9 +229,9 @@ def run_code(source_code, language_id, test_cases, session_id):
 
         if result.returncode == 0:
             if result.stdout.strip() == expected_output.strip():
-                result_dict["status"] = "Accepted"
+                result_dict["status"] = "AC"
             else:
-                result_dict["status"] = "Wrong Answer"
+                result_dict["status"] = "WA"
 
         results.append(result_dict)
 
