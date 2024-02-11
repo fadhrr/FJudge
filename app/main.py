@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import uuid
 from fastapi import FastAPI, HTTPException, Body, Request, Cookie
@@ -53,6 +54,7 @@ class CodeExecutionResponse(BaseModel):
     language_id: int
     results: List[dict]
     avg_time: float
+    avg_memory: int
     verdict: str
 
 
@@ -117,11 +119,20 @@ async def judge(
 
         # menghitung rata-rata time 
         total_time = 0
+        total_memory = 0
         for result in results:
             total_time += result["time"]
-        avg_time = total_time/len(results)
 
-        test_num = 0
+            # temp solution
+            if result["memory"] == None:
+                continue
+            total_memory += result["memory"]
+            
+        avg_time = total_time/len(results)
+        avg_memory = total_memory/len(results)
+
+
+        # test_num = 0
         for result in results:
             if "CTE" == result["status"]:
                 verdict = f"CTE"
@@ -139,14 +150,12 @@ async def judge(
                 verdict = f"AC"
             
         # Membuat instansiasi dari model CodeExecutionResponse
-        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time, verdict=verdict)
+        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=avg_time, avg_memory=avg_memory, verdict=verdict)
         return response_model
 
     except Exception as e:
-        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=0, verdict=e)
+        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=0, avg_memory=0 , verdict=e)
         return response_model
-    
-
 
 def run_code(source_code, language_id, test_cases, session_id):
     results = []
@@ -163,7 +172,8 @@ def run_code(source_code, language_id, test_cases, session_id):
             "actual_output": None,
             "status": None,
             "err_msg": None,
-            "time": None
+            "time": None,
+            "memory": None
         }
 
         # Menyimpan source code ke file sementara
@@ -199,8 +209,18 @@ def run_code(source_code, language_id, test_cases, session_id):
         
         if languages[language_id] == "cpp" or languages[language_id] == "c":
             try:
-                result = subprocess.run([f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+                result = subprocess.run(["memusage", f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
                 # print(result)
+
+                match = re.search(r'heap total:\s+(\d+)', result.stderr)
+
+                if match:
+                    heap_total = match.group(1)
+                    # print("Heap total:", heap_total)
+                    result_dict["memory"] = int(heap_total)
+                else:
+                    print("Heap total not found in the memusage output.")
+                
                 if result.returncode != 0:
                     result_dict["status"] = "RTE"
                 
