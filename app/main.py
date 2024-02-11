@@ -154,7 +154,7 @@ async def judge(
         return response_model
 
     except Exception as e:
-        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=0, avg_memory=0 , verdict=e)
+        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=None, avg_memory=None , verdict=e)
         return response_model
 
 def run_code(source_code, language_id, test_cases, session_id):
