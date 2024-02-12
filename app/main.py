@@ -215,9 +215,9 @@ def run_code(source_code, language_id, test_cases, session_id):
                 match = re.search(r'heap total:\s+(\d+)', result.stderr)
 
                 if match:
-                    heap_total = match.group(1)
+                    heap_total = int(match.group(1))
                     # print("Heap total:", heap_total)
-                    result_dict["memory"] = int(heap_total)
+                    result_dict["memory"] = int(heap_total / 1024)
                 else:
                     print("Heap total not found in the memusage output.")
                 
@@ -234,8 +234,17 @@ def run_code(source_code, language_id, test_cases, session_id):
                 result_dict["status"] = str(e)
         elif languages[language_id] == "py":
             try:
-                result = subprocess.run(["python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+                result = subprocess.run(["memusage", "python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
                 # print(result)
+                match = re.search(r'heap total:\s+(\d+)', result.stderr)
+
+                if match:
+                    heap_total = int(match.group(1))
+                    # print("Heap total:", heap_total)
+                    result_dict["memory"] = int(heap_total / 1024)
+                else:
+                    print("Heap total not found in the memusage output.")
+
                 result_dict["err_msg"] = result.stderr
                 if result.returncode != 0:
                     result_dict["status"] = "RTE"
