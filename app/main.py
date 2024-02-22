@@ -171,7 +171,7 @@ def run_code(source_code, language_id, test_cases, session_id):
             "expected_output": expected_output,
             "actual_output": None,
             "status": None,
-            "err_msg": None,
+            # "err_msg": None,
             "time": None,
             "memory": None
         }
@@ -188,13 +188,13 @@ def run_code(source_code, language_id, test_cases, session_id):
                 compile_result = subprocess.run(["g++", "-g", file_name, "-o", f"temp_{session_id}"], capture_output=True)
                 
                 # untuk menampilkan warning error saat kompilasi
-                result_dict["err_msg"] = compile_result.stderr
+                # result_dict["err_msg"] = compile_result.stderr
                 # print(compile_result)
                 if compile_result.returncode != 0:
                     # Jika gagal kompilasi
                     result_dict["status"] = "CTE"
                     result_dict["time"] = 0
-                    result_dict["err_msg"] = compile_result.stderr
+                    # result_dict["err_msg"] = compile_result.stderr
                     results.append(result_dict)
 
                     # Menghapus file sementara jika sudah selesai digunakan
@@ -245,7 +245,7 @@ def run_code(source_code, language_id, test_cases, session_id):
                 else:
                     print("Heap total not found in the memusage output.")
 
-                result_dict["err_msg"] = result.stderr
+                # result_dict["err_msg"] = result.stderr
                 if result.returncode != 0:
                     result_dict["status"] = "RTE"
             except subprocess.TimeoutExpired:
@@ -276,7 +276,8 @@ def run_code(source_code, language_id, test_cases, session_id):
     # Mengembalikan hasil eksekusi
     return results
 
-
+if __name__ == "__main__":
+   uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
 
 
     
