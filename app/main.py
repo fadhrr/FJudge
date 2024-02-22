@@ -1,11 +1,13 @@
 import os
 import re
+import signal
 import time
 import uuid
 from fastapi import FastAPI, HTTPException, Body, Request, Cookie
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+import psutil
 from pydantic import BaseModel
 from enum import Enum
 from typing import List, Annotated, Union
@@ -157,6 +159,15 @@ async def judge(
         response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=None, avg_memory=None , verdict=e)
         return response_model
 
+def kill_child_processes(parent_pid, sig=signal.SIGTERM):
+    try:
+      parent = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+      return
+    children = parent.children(recursive=True)
+    for process in children:
+      process.send_signal(sig)
+      
 def run_code(source_code, language_id, test_cases, session_id):
     results = []
     
@@ -209,10 +220,21 @@ def run_code(source_code, language_id, test_cases, session_id):
         
         if languages[language_id] == "cpp" or languages[language_id] == "c":
             try:
-                result = subprocess.run(["memusage", f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+                # result = subprocess.run(["memusage", f"./temp_{session_id}"], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+                process = subprocess.Popen(["memusage", f"./temp_{session_id}"], 
+                                stdin=subprocess.PIPE, 
+                                stdout=subprocess.PIPE, 
+                                stderr=subprocess.PIPE, 
+                                text=True)
+                
+                # Here you can get the PID
+                parent_pid = process.pid
                 # print(result)
 
-                match = re.search(r'heap total:\s+(\d+)', result.stderr)
+                # Berinteraksi dengan subprocess dan menunggu hingga selesai atau timeout (5 detik)
+                stdout, stderr = process.communicate(input=input_data, timeout=2)
+                result_dict["actual_output"] = stdout
+                match = re.search(r'heap total:\s+(\d+)', stderr)
 
                 if match:
                     heap_total = int(match.group(1))
@@ -221,22 +243,36 @@ def run_code(source_code, language_id, test_cases, session_id):
                 else:
                     print("Heap total not found in the memusage output.")
                 
-                if result.returncode != 0:
+                if process.returncode != 0:
                     result_dict["status"] = "RTE"
-                
+
                 # Menghapus file compiled jika sudah selesai digunakan
                 os.remove(f"temp_{session_id}")
             except subprocess.TimeoutExpired:
                 os.remove(f"temp_{session_id}")
+                kill_child_processes(parent_pid)
                 result_dict["status"] = "TLE"
             except subprocess.CalledProcessError as e:
                 # Tangani kesalahan saat menjalankan program C++ yang dikompilasi
                 result_dict["status"] = str(e)
         elif languages[language_id] == "py":
             try:
-                result = subprocess.run(["memusage", "python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
+                # result = subprocess.run(["memusage", "python", file_name], input=input_data, text=True, capture_output=True, timeout=5)  # Ganti 5 dengan batas waktu yang diinginkan (dalam detik)
                 # print(result)
-                match = re.search(r'heap total:\s+(\d+)', result.stderr)
+                process = subprocess.Popen(["memusage", "python", file_name], 
+                                stdin=subprocess.PIPE, 
+                                stdout=subprocess.PIPE, 
+                                stderr=subprocess.PIPE, 
+                                text=True)
+                
+                # Here you can get the PID
+                parent_pid = process.pid
+                # print(result)
+
+                # Berinteraksi dengan subprocess dan menunggu hingga selesai atau timeout (5 detik)
+                stdout, stderr = process.communicate(input=input_data, timeout=2)
+                result_dict["actual_output"] = stdout
+                match = re.search(r'heap total:\s+(\d+)', stderr)
 
                 if match:
                     heap_total = int(match.group(1))
@@ -246,9 +282,10 @@ def run_code(source_code, language_id, test_cases, session_id):
                     print("Heap total not found in the memusage output.")
 
                 # result_dict["err_msg"] = result.stderr
-                if result.returncode != 0:
+                if process.returncode != 0:
                     result_dict["status"] = "RTE"
             except subprocess.TimeoutExpired:
+                kill_child_processes(parent_pid)
                 result_dict["status"] = "TLE"
             except subprocess.CalledProcessError as e:
                 # Tangani kesalahan saat menjalankan program Python
@@ -262,16 +299,14 @@ def run_code(source_code, language_id, test_cases, session_id):
         os.remove(file_name)
 
         result_dict["time"] = execution_time
-        result_dict["actual_output"] = result.stdout
 
-        if result.returncode == 0:
-            if result.stdout.strip() == expected_output.strip():
+        if process.returncode == 0:
+            if result_dict["actual_output"].strip() == expected_output.strip():
                 result_dict["status"] = "AC"
             else:
                 result_dict["status"] = "WA"
 
         results.append(result_dict)
-
 
     # Mengembalikan hasil eksekusi
     return results
