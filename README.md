@@ -14,6 +14,7 @@ To run FJudge without Docker, you need to follow these steps:
 
 #### Prerequisites
 - Make sure Python is installed on your system.
+- Make sure `memusage` bash script is installed (Usually installed on Linux).
 
 1. **Install Dependencies:**
    ```bash

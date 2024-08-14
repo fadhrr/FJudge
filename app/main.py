@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import psutil
 from pydantic import BaseModel
 from enum import Enum
-from typing import List, Annotated, Union
+from typing import List, Annotated, Optional, Union
 import subprocess
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -55,8 +55,8 @@ class CodeExecutionResponse(BaseModel):
     source_code: str
     language_id: int
     results: List[dict]
-    avg_time: float
-    avg_memory: int
+    avg_time: Optional[float] = None
+    avg_memory: Optional[int] = None
     verdict: str
 
 
@@ -156,7 +156,7 @@ async def judge(
         return response_model
 
     except Exception as e:
-        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=None, avg_memory=None , verdict=e)
+        response_model = CodeExecutionResponse(identifier=request.identifier, source_code=request.source_code , language_id=request.language_id, results=results, avg_time=None, avg_memory=None , verdict=str(e))
         return response_model
 
 def kill_child_processes(parent_pid, sig=signal.SIGTERM):
